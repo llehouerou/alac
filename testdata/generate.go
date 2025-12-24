@@ -8,6 +8,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -54,7 +55,7 @@ var configs = []TestConfig{
 	{96000, 24, 2, 4096},
 }
 
-var audioTypes = []string{"silence", "sine1k", "sweep", "noise"}
+var audioTypes = []string{"silence", "sine1k", "sweep", "noise", "whitenoise"}
 
 func main() {
 	if err := checkFFmpeg(); err != nil {
@@ -196,6 +197,11 @@ func generateWAV(path, audioType string, cfg TestConfig, samples int) error {
 				seed := uint32(i*cfg.NumChannels + ch + 12345)
 				seed = seed*1103515245 + 12345
 				sample = float64(int32(seed))/float64(math.MaxInt32) * 0.5
+			case "whitenoise":
+				// True random noise using crypto/rand - high entropy may trigger uncompressed frames
+				var b [2]byte
+				rand.Read(b[:])
+				sample = float64(int16(binary.LittleEndian.Uint16(b[:]))) / 32768.0
 			}
 
 			// Scale to sample size and write

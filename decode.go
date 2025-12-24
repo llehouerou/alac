@@ -947,7 +947,6 @@ func (alac *Alac) decodeFrame(inbuffer []byte) []byte {
 			}
 		} else {
 			/* not compressed, easy case */
-			// note: translation untested
 			if alac.setinfo_sample_size <= 16 {
 				for i := uint32(0); i < outputsamples; i++ {
 					audiobits_a := alac.readbits(int(alac.setinfo_sample_size))
