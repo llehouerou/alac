@@ -1,2 +1,6 @@
 # Generated test data
 testdata/generated/
+
+# Coverage artifacts
+*.out
+coverage.html
