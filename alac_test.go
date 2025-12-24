@@ -6,6 +6,61 @@ import (
 	"testing"
 )
 
+func TestPredictorDecompressFirAdaptZeroCoef(t *testing.T) {
+	// Test the predictor_coef_num == 0 case where error buffer is copied directly
+	// This tests the memcpy translation: copy should copy (output_size-1) elements, not bytes
+	error_buffer := []int32{100, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	buffer_out := make([]int32, 10)
+	var predictor_coef_table [32]int16
+
+	predictorDecompressFirAdapt(
+		error_buffer,
+		buffer_out,
+		10,              // output_size
+		16,              // readsamplesize
+		predictor_coef_table,
+		0,               // predictor_coef_num = 0 triggers the copy path
+		0,               // predictor_quantitization
+	)
+
+	// First sample is always copied
+	if buffer_out[0] != 100 {
+		t.Errorf("buffer_out[0] = %d, want 100", buffer_out[0])
+	}
+
+	// Remaining samples should be copied from error_buffer
+	for i := 1; i < 10; i++ {
+		if buffer_out[i] != int32(i) {
+			t.Errorf("buffer_out[%d] = %d, want %d", i, buffer_out[i], i)
+		}
+	}
+}
+
+func TestSignExtend24(t *testing.T) {
+	tests := []struct {
+		input int32
+		want  int32
+	}{
+		// Positive values (bit 23 = 0) should stay the same
+		{0x000000, 0},
+		{0x000001, 1},
+		{0x7FFFFF, 8388607}, // max positive 24-bit value
+
+		// Negative values (bit 23 = 1) need sign extension
+		{0x800000, -8388608}, // min negative 24-bit value (should become 0xFF800000)
+		{0xFFFFFF, -1},       // -1 in 24-bit (should become 0xFFFFFFFF)
+		{0x800001, -8388607},
+		{0xFFFFFE, -2},
+	}
+
+	for _, tt := range tests {
+		got := signExtend24(tt.input)
+		if got != tt.want {
+			t.Errorf("signExtend24(0x%06X) = %d, want %d", tt.input, got, tt.want)
+		}
+	}
+}
+
 func Test(t *testing.T) {
 	a, err := New()
 	if err != nil {

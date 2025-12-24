@@ -89,11 +89,10 @@ func _Swap16(v int16) int16 {
 }
 */
 
-// TODO: figure out how to translate the C bitfield to Go
-// struct {signed int x:24;} se_struct_24;
-// #define SignExtend24(val) (se_struct_24.x = val)
+// signExtend24 sign-extends a 24-bit value to 32 bits.
+// Shift left to put bit 23 into the sign position, then arithmetic right shift.
 func signExtend24(v int32) int32 {
-	return v
+	return (v << 8) >> 8
 }
 
 func (alac *Alac) allocateBuffers() {
@@ -389,7 +388,8 @@ func (alac *Alac) entropyRiceDecode(
 			// got blockSize 0s
 			if blockSize > 0 {
 				// memset(&outputBuffer[outputCount+1], 0, blockSize*sizeof(*outputBuffer))
-				for i := outputCount + 1; i < outputCount+1+int(blockSize*4); i++ {
+				// Note: blockSize is element count, not bytes
+				for i := outputCount + 1; i < outputCount+1+int(blockSize); i++ {
 					outputBuffer[i] = 0
 				}
 				outputCount += int(blockSize)
@@ -436,7 +436,8 @@ func predictorDecompressFirAdapt(
 			return
 		}
 		// memcpy(buffer_out+1, error_buffer+1, (output_size-1) * 4);
-		copy(buffer_out[1:], error_buffer[1:1+((output_size-1)*4)])
+		// Note: Go's copy() on []int32 copies elements, not bytes
+		copy(buffer_out[1:], error_buffer[1:output_size])
 		return
 	}
 
