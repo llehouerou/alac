@@ -23,7 +23,7 @@ func TestMatrix(t *testing.T) {
 
 	entries, err := os.ReadDir(baseDir)
 	if os.IsNotExist(err) {
-		t.Skip("Test data not generated. Run: go run testdata/generate.go")
+		t.Skip("Test data not generated. Run: go run testdata/generate.go (requires FFmpeg)")
 	}
 	if err != nil {
 		t.Fatalf("Failed to read test data directory: %v", err)
