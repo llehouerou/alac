@@ -17,6 +17,20 @@ import (
 	"path/filepath"
 )
 
+// Real audio samples from Librivox (public domain)
+// Source WAV files are stored in testdata/samples/
+var realAudioSamples = []struct {
+	name   string
+	source string // relative to testdata/
+}{
+	// "Jane Eyre" by Charlotte Bronte, Chapter 1 (5 seconds)
+	// LibriVox recording (version 3)
+	{"librivox_jane_eyre", "samples/jane_eyre_5s.wav"},
+	// "The Count of Monte Cristo" by Alexandre Dumas, Chapter 1 (5 seconds)
+	// LibriVox recording
+	{"librivox_monte_cristo", "samples/monte_cristo_5s.wav"},
+}
+
 // TestConfig describes a test configuration
 type TestConfig struct {
 	SampleRate  int `json:"sample_rate"`
@@ -55,6 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Generate synthetic audio for each config
 	for _, cfg := range configs {
 		dirName := fmt.Sprintf("%d_%d_%s", cfg.SampleRate, cfg.SampleSize, channelName(cfg.NumChannels))
 		dir := filepath.Join(baseDir, dirName)
@@ -68,6 +83,21 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Error generating %s/%s: %v\n", dirName, audioType, err)
 			} else {
 				fmt.Printf("Generated %s/%s\n", dirName, audioType)
+			}
+		}
+	}
+
+	// Generate real audio samples from Librivox
+	realDir := filepath.Join(baseDir, "real_audio")
+	if err := os.MkdirAll(realDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating real audio directory: %v\n", err)
+	} else {
+		for _, sample := range realAudioSamples {
+			sourcePath := filepath.Join("testdata", sample.source)
+			if err := generateRealAudioTestCase(realDir, sample.name, sourcePath); err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating real audio %s: %v\n", sample.name, err)
+			} else {
+				fmt.Printf("Generated real_audio/%s\n", sample.name)
 			}
 		}
 	}
@@ -236,4 +266,44 @@ func writeConfig(path string, cfg TestConfig) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
+}
+
+// generateRealAudioTestCase processes a local WAV sample into ALAC test data
+func generateRealAudioTestCase(dir, name, wavSourcePath string) error {
+	m4aPath := filepath.Join(dir, name+".m4a")
+	rawPath := filepath.Join(dir, name+".raw")
+	jsonPath := filepath.Join(dir, name+".json")
+
+	// Skip if all files exist
+	if fileExists(m4aPath) && fileExists(rawPath) && fileExists(jsonPath) {
+		return nil
+	}
+
+	// Check source exists
+	if !fileExists(wavSourcePath) {
+		return fmt.Errorf("source file not found: %s", wavSourcePath)
+	}
+
+	// Encode to ALAC
+	if err := encodeALAC(wavSourcePath, m4aPath); err != nil {
+		return fmt.Errorf("encoding ALAC: %w", err)
+	}
+
+	// Decode to raw PCM
+	cfg := TestConfig{
+		SampleRate:  44100,
+		SampleSize:  16,
+		NumChannels: 2,
+		FrameSize:   4096,
+	}
+	if err := decodeToRaw(m4aPath, rawPath, cfg); err != nil {
+		return fmt.Errorf("decoding to raw: %w", err)
+	}
+
+	// Write config
+	if err := writeConfig(jsonPath, cfg); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+
+	return nil
 }
