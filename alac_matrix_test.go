@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -23,7 +24,15 @@ func TestMatrix(t *testing.T) {
 
 	entries, err := os.ReadDir(baseDir)
 	if os.IsNotExist(err) {
-		t.Skip("Test data not generated. Run: go run testdata/generate.go (requires FFmpeg)")
+		// Try to auto-generate if FFmpeg is available
+		if !ffmpegAvailable() {
+			t.Skip("Test data not generated and FFmpeg not found. Install FFmpeg and rerun tests.")
+		}
+		t.Log("Auto-generating test data...")
+		if err := runGenerator(); err != nil {
+			t.Fatalf("Failed to generate test data: %v", err)
+		}
+		entries, err = os.ReadDir(baseDir)
 	}
 	if err != nil {
 		t.Fatalf("Failed to read test data directory: %v", err)
@@ -458,4 +467,16 @@ func extractSamples(mdatData []byte, mdatOffset int64, sampleSizes []int, chunkO
 	}
 
 	return frames
+}
+
+func ffmpegAvailable() bool {
+	cmd := exec.Command("ffmpeg", "-version")
+	return cmd.Run() == nil
+}
+
+func runGenerator() error {
+	cmd := exec.Command("go", "run", "testdata/generate.go")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
